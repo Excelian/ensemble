@@ -1,0 +1,185 @@
+setup:
+    db_host: 192.168.1.70
+    db_name: SYMPHONY 
+    db_user: psetl 
+    db_pass: abc123 
+    db_port: 1433
+    es_hosts: 127.0.0.1,localhost  # Comma separated list of ES hosts in cluster
+    es_ssl: False
+    es_cacerts: /path/to/cacerts
+    es_verify_certs: False
+    max_rows: 5000
+    identity_field: INSERT_SEQ
+    index: grid
+    debug: True 
+    log_file: ensemble.log
+    interval: 30
+loaders:
+    consumer_resource_allocation:
+        sql: > 
+            SELECT TOP (?) [CONSUMER_RESOURCE_ALLOCATION].[CONSUMER_NAME],
+            [CONSUMER_RESOURCE_ALLOCATION].[INSERT_SEQ],
+            [CONSUMER_RESOURCE_ALLOCATION].[RESOURCE_GROUP],
+            [CONSUMER_RESOURCE_ALLOCATION].[CLUSTER_NAME],
+            [CONSUMER_RESOURCE_ALLOCATION].[TIME_STAMP],
+            [CONSUMER_RESOURCE_ALLOCATION].[ALLOCATED_SHARE],
+            [CONSUMER_RESOURCE_ALLOCATION].[ALLOCATED_OWN],
+            [CONSUMER_RESOURCE_ALLOCATION].[ALLOCATED_BORROW],
+            [CONSUMER_RESOURCE_ALLOCATION].[ALLOCATED_LEND],
+            [CONSUMER_RESOURCE_ALLOCATION].[BORROW_FROM],
+            [CONSUMER_RESOURCE_ALLOCATION].[BORROW_LIMIT],
+            [CONSUMER_RESOURCE_ALLOCATION].[LENDING_LIMIT],
+            [CONSUMER_RESOURCE_ALLOCATION].[PLANNED_OWN],
+            [CONSUMER_RESOURCE_ALLOCATION].[USED],
+            [CONSUMER_RESOURCE_ALLOCATION].[LEND_TO],
+            [CONSUMER_RESOURCE_ALLOCATION].[SHARE_LIMIT],
+            [CONSUMER_RESOURCE_ALLOCATION].[SHARE_RATIO],
+            [CONSUMER_RESOURCE_ALLOCATION].[SHARE_QUOTA],
+            [CONSUMER_RESOURCE_ALLOCATION].[TOTAL_DEMAND],
+            [CONSUMER_RESOURCE_ALLOCATION].[UNSATISFIED_DEMAND],
+            [CONSUMER_RESOURCE_ALLOCATION].[PLANNED_HOWN],
+            [CONSUMER_RESOURCE_ALLOCATION].[PLANNED_HRESERVE],
+            [CONSUMER_RESOURCE_ALLOCATION].[PLANNED_QUOTA]
+            FROM [CONSUMER_RESOURCE_ALLOCATION]
+            WHERE [CONSUMER_RESOURCE_ALLOCATION].[INSERT_SEQ] > ?
+        type: consumer_resource_allocation
+        index: grid_metrics_sampled
+        num_replicas: 0
+        num_shards: 1
+    consumer_demand:
+        sql: >
+            SELECT TOP (?) [CONSUMER_DEMAND].[CLUSTER_NAME],
+            [CONSUMER_DEMAND].[TIME_STAMP],
+            [CONSUMER_DEMAND].[CONSUMER_NAME],
+            [CONSUMER_DEMAND].[MAX_REQUESTED],
+            [CONSUMER_DEMAND].[USED],
+            [CONSUMER_DEMAND].[INSERT_SEQ]
+            FROM [SYMPHONY].[dbo].[CONSUMER_DEMAND]
+            WHERE [CONSUMER_DEMAND].[INSERT_SEQ] > ?
+            ORDER BY [CONSUMER_DEMAND].[INSERT_SEQ] ASC
+        type: consumer_demand 
+        index: grid_metrics_sampled
+        num_replicas: 0
+        num_shards: 1
+    resources:
+        sql: >
+            SELECT TOP (?) [CLUSTER_NAME],
+            [TIME_STAMP],
+            [RESOURCE_NAME],
+            [RESOURCE_TYPE],
+            [ATTRIBUTE_NAME],
+            [ATTRIBUTE_TYPE],
+            [ATTRIBUTE_VALUE_STR],
+            [ATTRIBUTE_VALUE_NUM],
+            [INSERT_SEQ]
+            FROM [SYMPHONY].[dbo].[RESOURCE_METRICS]
+            WHERE [INSERT_SEQ] > ?
+            ORDER BY [INSERT_SEQ] ASC
+        type: resource_attributes
+        index: grid_metrics_sampled
+        num_replicas: 0
+        num_shards: 1
+    session_attributes:
+        sql: >
+            SELECT TOP (?) [CLUSTER_NAME],
+            [TIME_STAMP],
+            [SESSION_ID],
+            [SESSION_NAME],
+            [APP_NAME],
+            [CONSUMER_NAME],
+            [SUBMISSION_USER],
+            [PRIORITY],
+            [COMMON_DATA_SIZE],
+            [NUM_TASK_PENDING],
+            [NUM_TASK_RUNNING],
+            [NUM_TASK_DONE],
+            [NUM_TASK_ERROR],
+            [NUM_TASK_CANCELED],
+            [TOTAL_INPUT_SIZE],
+            [TOTAL_OUTPUT_SIZE],
+            [TOTAL_TASKS_RUNTIME],
+            [TOTAL_UNSUCCESS_TASKRUNS],
+            [TOTAL_UNSUCCESS_TASKSRUNTIME],
+            [INSERT_SEQ] as INSERT_SEQ
+            FROM [SYMPHONY].[dbo].[SESSION_ATTRIBUTES]
+            WHERE [INSERT_SEQ] > ?
+            ORDER BY INSERT_SEQ ASC
+        type: session_attributes
+        index: grid_metrics_sampled
+        num_replicas: 0
+        num_shards: 1
+    session_history:
+        sql: >
+            SELECT top (?) [CLUSTER_NAME],
+            [TIME_STAMP],
+            [TIME_STAMP_GMT],
+            [SESSION_ID],
+            [SESSION_NAME],
+            [APP_NAME],
+            [CONSUMER_NAME],
+            [PRIORITY],
+            [SESSION_STATE],
+            [NUM_TASK_PENDING],
+            [NUM_TASK_RUNNING],
+            [NUM_TASK_DONE],
+            [NUM_TASK_ERROR],
+            [NUM_TASK_CANCELED],
+            [SERVICE_INSTANCES],
+            [SUBMISSION_USER],
+            [REASON],
+            [END_TIME],
+            [ABORT_SESSION_IF_TASK_FAIL],
+            [RECOVERABLE],
+            [SESSION_TYPE],
+            [CREATE_TIME],
+            [LAST_ERROR_TIME],
+            [TASK_RETRY_LIMIT],
+            [SERVICE],
+            [TOTAL_UNSUCCESS_TASKRUNS],
+            [TOTAL_UNSUCCESS_TASKSRUNTIME],
+            [TOTAL_TASKS_RUNTIME],
+            [TOTAL_INPUT_SIZE],
+            [TOTAL_OUTPUT_SIZE],
+            [COMMON_DATA_SIZE],
+            [TOTAL_TASKS_SUBMIT2START_TIME],
+            [SESSION_TAG],
+            [PROTOCOL_VERSION],
+            [SYMPHONY_VERSION],
+            [SESSION_BINDING_FAILURES],
+            [SESSION_UPDATE_FAILURES],
+            [NUM_COMMON_DATA_UPDATES],
+            [TOTAL_COMMON_DATA_UPDATE_SIZE],
+            [COMPRESSION_ENABLED],
+            [COMMON_DATA_COMPRESSED],
+            [RAW_COMMON_DATA_SIZE],
+            [COMPRESSION_THRESHOLD],
+            [DIRECT_DATA_TRANSFER_ENABLED],
+            [PREEMPTIVE],
+            [CLIENT_VERSION],
+            [CLIENT_HOST_NAME],
+            [CLIENT_IP_ADDRESS],
+            [CLIENT_OS_USER_NAME],
+            [SERVICE_TO_SLOT_RATIO],
+            [RESOURCE_GROUP_FILTER],
+            [PREEMPTION_RANK],
+            [TASKS_INTERRUPTED_BY_PREEMPT],
+            [PREEMPT_TIME],
+            [TASKS_INTERRUPTED_BY_RECLAIM],
+            [RECLAIM_TIME],
+            [SESSION_METADATA],
+            [NUM_TASK_YIELDED],
+            [NUM_TASK_RESUMING],
+            [PARENT_ID],
+            [ROOT_SESSION_ID],
+            [TASK_DISPATCH_ORDER],
+            [POLICY_TAG_PATH],
+            [SESSION_TIMEOUT],
+            [TASK_EXECUTION_TIMEOUT],
+            [INSERT_SEQ]
+            FROM [SESSION_HISTORY]
+            where [INSERT_SEQ] > ? 
+            order by [INSERT_SEQ] ASC
+        type: session_history
+        index: grid_metrics
+        num_replicas: 0
+        num_shards: 1
