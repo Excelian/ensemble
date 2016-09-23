@@ -8,6 +8,8 @@ setup:
     es_ssl: False
     es_cacerts: /path/to/cacerts
     es_verify_certs: False
+    es_max_retries: 2 # number of times to retry connecting
+    es_retry_wait: 5 # Seconds to wait before retrying connection
     max_rows: 5000
     identity_field: INSERT_SEQ
     index: grid

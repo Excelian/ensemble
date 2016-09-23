@@ -14,13 +14,14 @@ import os
 
 from loader import (
         BasicSQLLoader,
-        ConsumerDemandLoader,
-        ConsumerResourceAllocationLoader,
-        ResourceMetricsLoader,
-        SessionHistoryLoader,
-        SessionAttributesLoader
+        ConsumerDemandLoader
+#        ConsumerResourceAllocationLoader,
+#        ResourceMetricsLoader,
+#        SessionHistoryLoader,
+#        SessionAttributesLoader
 )
 from helpers import get_db_engine, get_es_conn
+import index_config.consumer_demand
 
 CONFIG_FILE="config.yml" # always look for config.yml in CWD
 
@@ -86,6 +87,7 @@ def get_loaders(cfg, engine, es):
                             sql=loaderconf['sql'],
                             doctype=loaderconf['type']))
     return loaders
+
 def main():
     cfg = sys.argv[1] if len(sys.argv) > 1 else CONFIG_FILE
     if not os.path.isfile(cfg):
@@ -113,22 +115,33 @@ def main():
     logger.info("DB Engine done")
     # Get an Elasticsearch connection
     es_hosts = setup['es_hosts'].split(',')
-    es = get_es_conn(es_hosts, setup['es_ssl'],
-                setup['es_verify_certs'], setup['es_cacerts']) 
-    if not es:
-        sys.exit("Problems connecting to Elasticsearch. See log for details")
-    else:
-        logger.info("Connected to Elasticsearch : %s" \
+    for _ in range(setup['es_max_retries']):
+        es = get_es_conn(es_hosts, setup['es_ssl'],
+                    setup['es_verify_certs'], setup['es_cacerts']) 
+        if es:
+            logger.info("Connected to Elasticsearch : %s" \
                 % es.info().get('cluster_name', 'unknown'))
+            break
+
+        logger.warning("Retrying connection to Elasticsearch")
+        time.sleep(setup['es_retry_wait'])
+    else:
+        logger.criticial("Failed Connecting to Elasticsearch")
+        sys.exit(1)
 
     # Build our list of SQL loaders
     logger.info("Building list of loaders")
-    loaders = get_loaders(cfg, engine, es) 
+    #loaders = get_loaders(cfg, engine, es) 
 
-    #sys.exit(1)
     # We got all our configs, let's run now
     logger.info("Initialisation complete: let's do some ETL !")
-    run(loaders, int(setup.get('interval', 60)))
+    loaderconf = cfg['loaders'].get('consumer_demand', {})
+    c = ConsumerDemandLoader(db_engine=engine,
+                    es_conn=es,
+                    sql=loaderconf['sql'],
+                    es_config=index_config.consumer_demand.config)
+    c.load()
+    sys.exit(1)
 
 if __name__ == '__main__':
     main()

@@ -12,6 +12,7 @@ import sys
 
 import sqlalchemy
 from elasticsearch import helpers
+from index_config.consumer_demand import config as consumer_demand_config
 import elasticsearch.exceptions
 
 module_name = 'Ensemble.sqlloader'
@@ -26,106 +27,68 @@ class Loader(object):
 
     """
     def __init__(self, db_engine, es_conn, max_rows=2000, 
-                    identity_field='INSERT_SEQ', index='',
-                    sql='', doctype='', chunk_size=100,
-                    num_shards=1, num_replicas=0):
+                    seq_field='INSERT_SEQ', sql='', doctype='',
+                    chunk_size=100, es_config=None):
         """ Constructor for a sqlloader object
-
-        we first use the elastic search connection to determine if the index
-        and doctype does exist. Indexes and mappings are created if they do
-        not exist. 
-
-        We then get the maximum sequence number from the elasticsearch for
-        this doctype and store them in self.seq in order to determine where
-        we left off (i.e. what is in the DB that we haven't loaded into ES)
+        A loader class for a table an index
 
         :param db_engine: sqlalchemy engine object
         :param es_conn: Elasticsearch connection object
         :param max_rows: num of rows to retrieve from DB at a time
-        :param identity_field: field in DB that corresponds to sequence num
-        :param index: name of elasticsearch index to populate
+        :param seq_field: field in DB that corresponds to sequence num
         :param sql: sql query to run to retrieve records
-        :param doctype: elasticsearch document type
         :param chunk_size: elasticsearch bulk insert chunk size
-        :param num_shards: elasticsearch shards to create for this index
-        :param num_replicas: elasticsearch replicas to create for this index
         """
         self.engine = db_engine
         self.es = es_conn
-        self.id_field = identity_field
-        self.sql = sql
-        self.doctype = doctype
-        self.index = index
-        self.num_replicas = num_replicas
-        self.num_shards = num_shards
-        self.chunk_size = chunk_size
         self.max_rows = max_rows
+        self.seq_field = seq_field
+        self.sql = sql
+        self.chunk_size = chunk_size
+        self.es_config = es_config
+        self.index_rollover = es_config['index_rollover']
         
         # Initialise logging
-        self.logger = logging.getLogger("%s.%s" % (module_name, self.doctype))
+        self.logger = logging.getLogger("%s.%s" % (module_name, 
+                                                es_config['template_name']))
 
-        # Create index and mapping if it doesn't exist
-        if not self.es.indices.exists(self.index):
-            self.logger.info("Index %s not found, creating it" % self.index)
-            self._create_index()
+        # Create template if it doesn't exist
+        self._init_es(es_config)
 
-        if not self.es.indices.exists_type(index=self.index,
-                                            doc_type=self.doctype):
-            self.logger.info("Mapping %s not found, creating it" % self.doctype)
-            self._create_mapping()
-            self.seq = -1
-        else:
-            seq = self._find_last_seq()
-            # last_seq might be None if there is an empty but with no
-            # docs in it. In this case, we return -1
-            self.seq = seq if seq != None else -1
-            self.logger.info("Sequence number for %s = %d" %
-                            (self.doctype, self.seq)) 
+        # We need to know where we left off by getting the largest
+        # sequence number in the index
+        self.seq = self._find_last_seq(es_config['all_index'])
+        self.logger.info("Last Sequence number = %d" % self.seq)
 
-    def _create_index(self):
-        """ Creates the elasticsearch index
-        """
-        self.es.indices.create(
-                index=self.index,
-                body={
-                    'settings' : {
-                        'number_of_shards' : self.num_shards,
-                        'number_of_replicas' : self.num_replicas,
-                    }
-                }
-        )
-
-    def _create_mapping(self):
-        """ Override this method to create custom mapping for index
-            If not, Elasticsearch will just create a default mapping
-        """
-        pass
-
-    def _find_last_seq(self):
+    def _init_es(self, cfg):
+        if not cfg:
+            return False
+        # Check if templates exists, if not create them
+        if not self.es.indices.exists_template(name=cfg['template_name']):
+            self.logger("Creating template : %s" % cfg['template_name'])
+            self.es.indices.put_template(name=cfg['template_name'],
+                            body=cfg['template_body'])
+        
+    def _find_last_seq(self, index_name):
         """ Returns last(maximum) sequence number from elastic search index
 
         :returns: maximum/last sequence number if index exists. -1 otherwise
         """
-        self.logger.info("Finding maximum sequence number" \
-                    "for %s in elasticsearch" % self.doctype)
+        self.logger.info("Finding max seq for index %s" % index_name)
+        search_body = {
+            "query": { "match_all": {}},
+            "size": 1,
+            "sort": [{
+                "INSERT_SEQ": {"order": "desc"}
+            }]
+        }
         try:
-            res = self.es.search(index=self.index,
-                                doc_type=self.doctype,
-                                body={
-                                    "size" : 0,
-                                    "aggs" : {
-                                        "max_seq" : { 
-                                            "max" : { 
-                                                "field" : self.id_field 
-                                            }
-                                        }
-                                    }
-                                })
+            res = self.es.search(index=index_name, body=search_body)        
         except elasticsearch.exceptions.NotFoundError:
-            self.logger.info('No sequence number found for %s' % self.doctype)
+            self.logger.info('No sequence number found for %s' % index_name)
             return -1
         else:
-            return res["aggregations"]["max_seq"]["value"]
+            return res["hits"]["hits"][0]["sort"][0]
     
     def _runsql(self):
         """ Run the SQL query and return the result set 
@@ -152,6 +115,19 @@ class Loader(object):
         """
         return body
 
+    def _get_index_name(self, timestamp):
+        """
+        Return an index name based on the rollover settings
+        """
+        if self.index_rollover.lower() == 'monthly':
+            return "%s-%s" % (self.es_config['all_index'],
+                                timestamp.strftime("%m%Y")) 
+        elif self.index_rollover.lower() == 'daily':
+            return "%s-%s" % (self.es_config['all_index'],
+                                timestamp.strftime("%d%m%Y")) 
+        else:
+            return self.es_config['all_index']
+
     def _load_elastic(self, sqldata):
         """ iterates through sqldata and bulk loads them into
             elastic search
@@ -164,28 +140,26 @@ class Loader(object):
             body = self._preprocess(dict(r.items()))
             if not body:
                 continue # Skip if preprocessing returns False
+            index_name = self._get_index_name(body['TIME_STAMP'])
             document = {
-                "_index" : self.index,
-                "_type" : self.doctype,
-                "_id" : body[self.id_field],
+                "_index" : index_name,
+                "_type" : 'default', # Hardcoded - we only have 1 doctype
+                "_id" : body[self.seq_field],
                 "_source" : body
                 }
             inserts.append(document)
 
         # update sequence to last item in the results
-        #self.seq = dict(results[-1].items())[self.id_field]
-        self.seq = sqldata[-1][self.id_field]
+        self.seq = sqldata[-1][self.seq_field]
         
         # Insert list of documents into elasticsearch
-        self.logger.info("Loading chunk into elasticsearch")
-        status = helpers.bulk(self.es,
-                                inserts,
-                                self.chunk_size)
-        self.logger.info("Finished loading chunk into elasticsearch")
+        status = helpers.bulk(self.es, inserts, self.chunk_size)
+        self.logger.info("Inserted %d chunks into %s" % (self.chunk_size,
+                                                        index_name))
         return status
 
     def load(self):
-        """ Loads all DB rows that are not in Elasticsearch
+        """ Loads all DB rows into Elasticsearch
             
         :returns: status of elasticsearch bulk load
         """
@@ -207,7 +181,7 @@ class Loader(object):
                 return True
 
     def __str__(self):
-        return "%s loader" % self.index
+        return "%s loader" % self.es_config['template_name']
 
 class BasicSQLLoader(Loader):
     """ Loader for Generic table 
@@ -524,7 +498,7 @@ class ResourceMetricsLoader(Loader):
 
         # update sequence to last item in the results
         #self.seq = dict(results[-1].items())[self.id_field]
-        self.seq = sqldata[-1][self.id_field]
+        self.seq = sqldata[-1][self.seq_field]
         
         return status
 

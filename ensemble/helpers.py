@@ -1,9 +1,8 @@
 import logging
 import urllib
 import sqlalchemy
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, TransportError, ConnectionError
    
-
 def get_db_engine(host, port, db_name, user, passwd):
     """ Get sqlalchemy engine from setup config
 
@@ -49,23 +48,25 @@ def get_es_conn(es_hostlist=None, ssl=False, verify_certs=False,
         return False
     assert(type(es_hostlist) == list)
 
-    if ssl:
-        es = Elasticsearch(
-                es_hostlist,
-                use_ssl=True,
-                verify_certs=verify_certs,
-                cacerts=cacerts_path
-        )
-    else:
-        es = Elasticsearch(
-                es_hostlist, # We'll try and connect to hosts defined here
-                # sniff before doing anything
-                sniff_on_start=True,
-                # refresh nodes after a node fails to respond
-                sniff_on_connection_fail=True,
-                # and also every 60 seconds
-                sniffer_timeout=60
-        )
+    try:
+        if ssl:
+            es = Elasticsearch(
+                    es_hostlist,
+                    use_ssl=True,
+                    verify_certs=verify_certs,
+                    cacerts=cacerts_path)
+        else:
+            es = Elasticsearch(
+                    es_hostlist, # We'll try and connect to hosts defined here
+                    # sniff before doing anything
+                    sniff_on_start=True,
+                    # refresh nodes after a node fails to respond
+                    sniff_on_connection_fail=True,
+                    # and also every 60 seconds
+                    sniffer_timeout=60)
+    except TransportError, ConnectionError:
+        return False
+
 
     try:
         esinfo = es.info()
