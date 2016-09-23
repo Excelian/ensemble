@@ -44,10 +44,6 @@ loaders:
             [CONSUMER_RESOURCE_ALLOCATION].[PLANNED_QUOTA]
             FROM [CONSUMER_RESOURCE_ALLOCATION]
             WHERE [CONSUMER_RESOURCE_ALLOCATION].[INSERT_SEQ] > ?
-        type: consumer_resource_allocation
-        index: grid_metrics_sampled
-        num_replicas: 0
-        num_shards: 1
     consumer_demand:
         sql: >
             SELECT TOP (?) [CONSUMER_DEMAND].[CLUSTER_NAME],
@@ -59,11 +55,7 @@ loaders:
             FROM [SYMPHONY].[dbo].[CONSUMER_DEMAND]
             WHERE [CONSUMER_DEMAND].[INSERT_SEQ] > ?
             ORDER BY [CONSUMER_DEMAND].[INSERT_SEQ] ASC
-        type: consumer_demand 
-        index: grid_metrics_sampled
-        num_replicas: 0
-        num_shards: 1
-    resources:
+    resource_metrics:
         sql: >
             SELECT TOP (?) [CLUSTER_NAME],
             [TIME_STAMP],
@@ -77,10 +69,6 @@ loaders:
             FROM [SYMPHONY].[dbo].[RESOURCE_METRICS]
             WHERE [INSERT_SEQ] > ?
             ORDER BY [INSERT_SEQ] ASC
-        type: resource_attributes
-        index: grid_metrics_sampled
-        num_replicas: 0
-        num_shards: 1
     session_attributes:
         sql: >
             SELECT TOP (?) [CLUSTER_NAME],
@@ -106,10 +94,6 @@ loaders:
             FROM [SYMPHONY].[dbo].[SESSION_ATTRIBUTES]
             WHERE [INSERT_SEQ] > ?
             ORDER BY INSERT_SEQ ASC
-        type: session_attributes
-        index: grid_metrics_sampled
-        num_replicas: 0
-        num_shards: 1
     session_history:
         sql: >
             SELECT top (?) [CLUSTER_NAME],
@@ -181,7 +165,3 @@ loaders:
             FROM [SESSION_HISTORY]
             where [INSERT_SEQ] > ? 
             order by [INSERT_SEQ] ASC
-        type: session_history
-        index: grid_metrics
-        num_replicas: 0
-        num_shards: 1

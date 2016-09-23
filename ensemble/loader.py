@@ -15,7 +15,7 @@ from elasticsearch import helpers
 from index_config.consumer_demand import config as consumer_demand_config
 import elasticsearch.exceptions
 
-module_name = 'Ensemble.sqlloader'
+module_name = 'Ensemble.loader'
 module_logger = logging.getLogger(module_name)
 
 # Elastic search loggers
@@ -65,7 +65,7 @@ class Loader(object):
             return False
         # Check if templates exists, if not create them
         if not self.es.indices.exists_template(name=cfg['template_name']):
-            self.logger("Creating template : %s" % cfg['template_name'])
+            self.logger.info("Creating template : %s" % cfg['template_name'])
             self.es.indices.put_template(name=cfg['template_name'],
                             body=cfg['template_body'])
         
@@ -200,61 +200,6 @@ class SessionAttributesLoader(Loader):
     def __init__(self, *args, **kwargs):
         super(SessionAttributesLoader, self).__init__(*args, **kwargs)
 
-    def _create_mapping(self):
-        """ Create custom mapping for sessions doctype 
-        """
-        self.es.indices.put_mapping(
-                index=self.index,
-                doc_type=self.doctype,
-                body={
-                    self.doctype: {
-                        "properties": {
-                            "CLUSTER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "TIME_STAMP": {
-                                "type": "date",
-                                "format": "dateOptionalTime"
-                            },
-                            "SESSION_ID": {"type": "long"},
-                            "SESSION_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "APP_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "CONSUMER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "SUBMISSION_USER": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "PRIORITY": {"type": "integer"},
-                            "COMMON_DATA_SIZE": {"type": "long"},
-                            "NUM_TASK_PENDING": {"type": "integer"},
-                            "NUM_TASK_RUNNING": {"type": "integer"},
-                            "NUM_TASK_DONE": {"type": "integer"},
-                            "NUM_TASK_ERROR": {"type": "integer"},
-                            "NUM_TASK_CANCELED": {"type": "integer"},
-                            "TOTAL_INPUT_SIZE": {"type": "long"},
-                            "TOTAL_OUTPUT_SIZE": {"type": "long"},
-                            "TOTAL_TASKS_RUNTIME": {"type": "long"},
-                            "TOTAL_UNSUCCESS_TASKRUNS": {
-                                "type": "integer"
-                            },
-                            "TOTAL_UNSUCCESS_TASKSRUNTIME": {
-                                "type": "long"
-                            },
-                            "INSERT_SEQ": {"type": "long"},
-                        }
-                    }
-                }
-        )
 
 class SessionHistoryLoader(Loader):
     """ Loader for SESSION_HISTORY Table 
@@ -266,144 +211,6 @@ class SessionHistoryLoader(Loader):
     def __init__(self, *args, **kwargs):
         super(SessionHistoryLoader, self).__init__(*args, **kwargs)
 
-    def _create_mapping(self):
-        """ Create custom mapping for Resource doctype 
-        """
-        self.es.indices.put_mapping(
-                index=self.index,
-                doc_type=self.doctype,
-                body={
-                    self.doctype: {
-                        "properties": {
-                            "ABORT_SESSION_IF_TASK_FAIL": {"type": "boolean"},
-                            "APP_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "CLIENT_HOST_NAME": {"type": "string",},
-                            "CLIENT_IP_ADDRESS": {"type": "string"},
-                            "CLIENT_OS_USER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "CLIENT_VERSION": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "CLUSTER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "COMMON_DATA_COMPRESSED": {"type": "boolean"},
-                            "COMMON_DATA_SIZE": {"type": "long"},
-                            "COMPRESSION_ENABLED": {"type": "boolean"},
-                            "COMPRESSION_THRESHOLD": {"type": "long"},
-                            "CONSUMER_NAME": {"type": "string"},
-                            "CREATE_TIME": {
-                                "type": "date",
-                                "format": "dateOptionalTime"
-                            },
-                            "DIRECT_DATA_TRANSFER_ENABLED": {
-                                "type": "boolean"
-                            },
-                            "END_TIME": {
-                                "type": "date",
-                                "format": "dateOptionalTime"
-                            },
-                            "INSERT_SEQ": {
-                                "type": "long"
-                            },
-                            "LAST_ERROR_TIME": {
-                                "type": "date",
-                                "format": "dateOptionalTime"
-                            },
-                            "NUM_COMMON_DATA_UPDATES": {"type": "long"},
-                            "NUM_TASK_CANCELED": {"type": "integer"},
-                            "NUM_TASK_DONE": {"type": "integer"},
-                            "NUM_TASK_ERROR": {"type": "integer"},
-                            "NUM_TASK_PENDING": {"type": "integer"},
-                            "NUM_TASK_RESUMING": {"type": "integer"},
-                            "NUM_TASK_RUNNING": {"type": "integer"},
-                            "NUM_TASK_YIELDED": {"type": "integer"},
-                            "PARENT_ID": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "POLICY_TAG_PATH": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "PREEMPTION_RANK": {"type": "long"},
-                            "PREEMPTIVE": {"type": "boolean"},
-                            "PREEMPT_TIME":{"type": "long"},
-                            "PRIORITY": {"type": "integer"},
-                            "PROTOCOL_VERSION": {"type": "integer"},
-                            "RAW_COMMON_DATA_SIZE": {"type": "long"},
-                            "REASON": { "type": "string"},
-                            "RECLAIM_TIME": { "type": "long"},
-                            "RECOVERABLE": { "type": "boolean"},
-                            "RESOURCE_GROUP_FILTER": { "type": "string"},
-                            "ROOT_SESSION_ID": { "type": "long"},
-                            "SERVICE": {"type": "string"},
-                            "SERVICE_INSTANCES": {"type":"integer"},
-                            "SERVICE_TO_SLOT_RATIO": {"type":"string"},
-                            "SESSION_BINDING_FAILURES": {"type":"string"},
-                            "SESSION_ID":{"type":"long"},
-                            "SESSION_METADATA": {"type":"string"},
-                            "SESSION_NAME": {"type":"string"},
-                            "SESSION_STATE": {"type":"string"},
-                            "SESSION_TAG": {"type":"string"},
-                            "SESSION_TIMEOUT": {"type": "long"},
-                            "SESSION_TYPE": {"type": "string"},
-                            "SESSION_UPDATE_FAILURES": {"type": "string"},
-                            "SUBMISSION_USER": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "SYMPHONY_VERSION": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "TASKS_INTERRUPTED_BY_PREEMPT": {
-                                "type":"integer"
-                            },
-                            "TASKS_INTERRUPTED_BY_RECLAIM": {
-                                "type": "integer"
-                            },
-                            "TASK_DISPATCH_ORDER": {
-                                "type": "string",
-                                "index": "not_analyzed"
-                            },
-                            "TASK_EXECUTION_TIMEOUT":{ "type": "integer"},
-                            "TASK_RETRY_LIMIT": { "type": "long"},
-                            "TIME_STAMP": {
-                                "type": "date",
-                                "format": "dateOptionalTime"
-                            },
-                            "TIME_STAMP_GMT": {"type": "long"},
-                            "TOTAL_COMMON_DATA_UPDATE_SIZE": {
-                                "type": "long"
-                            },
-                            "TOTAL_INPUT_SIZE": {
-                                "type": "long"
-                            },
-                            "TOTAL_OUTPUT_SIZE": {
-                                "type": "long"
-                            },
-                            "TOTAL_TASKS_RUNTIME": {
-                                "type": "double"
-                            },
-                            "TOTAL_TASKS_SUBMIT2START_TIME": {
-                                "type": "double"
-                            },
-                            "TOTAL_UNSUCCESS_TASKRUNS": { "type": "integer"},
-                            "TOTAL_UNSUCCESS_TASKSRUNTIME": {
-                                "type": "double"
-                            }
-                        }
-                    }
-                }
-        )
 
 class ResourceMetricsLoader(Loader):
     """ Loader for RESOURCE_METRICS Table 
@@ -447,7 +254,6 @@ class ResourceMetricsLoader(Loader):
             val = 100.0 * float(sqlrow['ATTRIBUTE_VALUE_NUM'])
         else:
             val = sqlrow['ATTRIBUTE_VALUE_NUM']
-
         return (attr, val)
 
     def _load_elastic(self, sqldata):
@@ -463,8 +269,8 @@ class ResourceMetricsLoader(Loader):
         :returns: status of elasticsearch bulk load
         """
         from collections import defaultdict
-        records = defaultdict(lambda: defaultdict(int))
         attributes = ResourceMetricsLoader.attr_fields.keys()
+        records = defaultdict(lambda: defaultdict(int))
         for sd in sqldata:
             r = dict(sd.items())
             if r['ATTRIBUTE_NAME'] not in attributes:
@@ -473,18 +279,17 @@ class ResourceMetricsLoader(Loader):
             r['RESOURCE_NAME'] = r['RESOURCE_NAME'].split('.')[0]
 
             (attr, val) = self._get_attr_val(r)
-            self.logger.debug("resource-time does not exist")
             records[r.get('RESOURCE_NAME'),r.get('TIME_STAMP')][attr] = val
             records[r.get('RESOURCE_NAME'),r.get('TIME_STAMP')]['INSERT_SEQ'] = r['INSERT_SEQ']
 
         # Construct docs from records
-        inserts = list()
+        inserts = [] 
         for k, v in records.iteritems():
             body = { attr: val for attr, val in v.iteritems() } 
             body['RESOURCE_NAME'], body['TIME_STAMP'] = k
             document = {
-                "_index" : self.index,
-                "_type" : self.doctype,
+                "_index" : self._get_index_name(body['TIME_STAMP']),
+                "_type" : 'default',
                 "_source" : body
             }
             inserts.append(document)
@@ -502,54 +307,6 @@ class ResourceMetricsLoader(Loader):
         
         return status
 
-    def _create_mapping(self):
-        """ Create custom mapping for Resource doctype 
-        """
-        self.es.indices.put_mapping(
-                index=self.index,
-                doc_type=self.doctype,
-                body={
-                    self.doctype: {
-                        "properties": {
-                            "CLUSTER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "TIME_STAMP": {
-                                "type": "date",
-                                "format": "dateOptionalTime"
-                            },
-                            "RESOURCE_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "RESOURCE_TYPE": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "NUM_CPUS": {"type": "integer"},
-                            "NUM_PROCS": {"type": "integer"},
-                            "NUM_CORES": {"type": "integer"},
-                            "NUM_THREADS": {"type": "integer"},
-                            "CPU_UTILISATION": {"type": "long"},
-                            "AVAILABLE_MEMORY": {"type": "long"},
-                            "AVAILABLE_SWAP": {"type": "long"},
-                            "PAGING_RATE": {"type": "long"},
-                            "DISK_IO_RATE": {"type": "long"},
-                            "NUM_SLOTS": {"type": "integer"},
-                            "NUM_FREE_SLOTS": {"type": "integer"},
-                            "15_SECOND_LOAD_AVERAGE": {"type": "long"},
-                            "15_MINUTE_LOAD_AVERAGE": {"type": "long"},
-                            "1_MINUTE_LOAD_AVERAGE": {"type": "long"},
-                            "MAXIMUM_MEMORY": {"type": "long"},
-                            "MAXIMUM_SWAP": {"type": "long"},
-                            "NUM_LOCAL_DISKS": {"type": "integer"},
-                            "IDLE_TIME": {"type": "long"},
-                            "INSERT_SEQ": {"type": "long"},
-                        }
-                    }
-                }
-        )
 
 class ConsumerResourceAllocationLoader(Loader):
     """ Loader for the CONSUMER_RESOURCE_ALLOCATION table
@@ -559,145 +316,10 @@ class ConsumerResourceAllocationLoader(Loader):
         super(ConsumerResourceAllocationLoader, self).__init__(*args,
                 **kwargs)
 
-    def _create_mapping(self):
-        """ Create custom mapping for Consumer index
-        """
-        self.es.indices.put_mapping(
-                index=self.index,
-                doc_type=self.doctype,
-                body={
-                    self.doctype: {
-                        "properties": {
-                            "CONSUMER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "INSERT_SEQ": {"type": "long"},
-                            "RESOURCE_GROUP": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "CLUSTER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "TIME_STAMP": {
-                                "type": "date",
-                                "format": "dateOptionalTime"
-                            },
-                            "ALLOCATED_SHARE": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "ALLOCATED_OWN": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "ALLOCATED_BORROW": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "ALLOCATED_LEND": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "BORROW_FROM": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "BORROW_LIMIT": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "LENDING_LIMIT": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "PLANNED_OWN": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "USED": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "LEND_TO": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "SHARE_LIMIT": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "SHARE_RATIO": {"type": "double"},
-                            "SHARE_QUOTA": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "TOTAL_DEMAND": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "UNSATISFIED_DEMAND": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "PLANNED_HOWN": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "PLANNED_HRESERVE": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "PLANNED_QUOTA": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                        }
-                    }
-                }
-        )
-
 class ConsumerDemandLoader(Loader):
-    """ Loader for the CONSUMER_DEMAN Table
+    """ Loader for the CONSUMER_DEMAND Table
 
     """
     def __init__(self, *args, **kwargs):
         super(ConsumerDemandLoader, self).__init__(*args,
                 **kwargs)
-
-    def _create_mapping(self):
-        """ Create custom mapping for Consumer index
-        """
-        self.es.indices.put_mapping(
-                index=self.index,
-                doc_type=self.doctype,
-                body={
-                    self.doctype: {
-                        "properties": {
-                            "CLUSTER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "TIME_STAMP": {
-                                "type": "date",
-                                "format": "dateOptionalTime"
-                            },
-                            "CONSUMER_NAME": {
-                                "type": "string",
-                                "index": "not_analyzed",
-                            },
-                            "MAX_REQUESTED": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "USED": {
-                                "type": "integer",
-                                "null_value": 0
-                            },
-                            "INSERT_SEQ": {"type": "long"},
-                        }
-                    }
-                }
-        )

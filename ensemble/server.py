@@ -14,25 +14,30 @@ import os
 
 from loader import (
         BasicSQLLoader,
-        ConsumerDemandLoader
-#        ConsumerResourceAllocationLoader,
-#        ResourceMetricsLoader,
-#        SessionHistoryLoader,
-#        SessionAttributesLoader
+        ConsumerDemandLoader,
+        ConsumerResourceAllocationLoader,
+        ResourceMetricsLoader,
+        SessionHistoryLoader,
+        SessionAttributesLoader
 )
 from helpers import get_db_engine, get_es_conn
 import index_config.consumer_demand
+import index_config.resource_metrics
+import index_config.consumer_resource_allocation
+import index_config.session_attributes
+import index_config.session_history
 
 CONFIG_FILE="config.yml" # always look for config.yml in CWD
 
-def run(loaders, interval):
+def run(loaders, interval, logger):
     """ Main loop of server ETL that continuously schedules each loader
 
     :param loaders: list of loader objects 
     :param interval: duration in seconds between each loading iteration
+    :param logger: logger object
     """ 
     while True:
-        logging.info('Begin scheduling tasks')
+        logger.info('Begin scheduling tasks')
         scheduler = sched.scheduler(time.time, time.sleep)
         
         # Add tasks to scheduler
@@ -42,50 +47,27 @@ def run(loaders, interval):
 
         # Run all tasks after adding them
         scheduler.run()
-        logging.info('All tasks completed, sleep %d seconds' % interval)
+        logger.info('All tasks completed, sleep %d seconds' % interval)
         time.sleep(interval)  # Sleep before next scheduling interval
     return
 
-def get_loaders(cfg, engine, es):
-    loaders = [] 
+def get_loaders(cfg, engine, es, logger):
+    classmap = {
+            "resource_metrics": ResourceMetricsLoader,
+            "consumer_demand": ConsumerDemandLoader,
+            "consumer_resource_allocation": ConsumerResourceAllocationLoader,
+            "session_attributes": SessionAttributesLoader,
+            "session_history": SessionHistoryLoader
+    }
+    loaders = []
     for loadername, loaderconf in cfg['loaders'].iteritems():
-        logging.info("Creating loader : %s" % loadername)
-        if loadername == "resources":
-            loaders.append(ResourceMetricsLoader(db_engine=engine,
+        logger.info("Creating loader : %s" % loadername)
+        config = getattr(index_config, loadername).config
+        loaderclass = classmap.get('loadername', BasicSQLLoader)
+        loaders.append(loaderclass(db_engine=engine,
                             es_conn=es,
-                            index=loaderconf['index'],
                             sql=loaderconf['sql'],
-                            doctype=loaderconf['type']))
-        elif loadername == "consumer_demand":
-            loaders.append(ConsumerDemandLoader(db_engine=engine,
-                            es_conn=es,
-                            index=loaderconf['index'],
-                            sql=loaderconf['sql'],
-                            doctype=loaderconf['type']))
-        elif loadername == "consumer_resource_allocation":
-            loaders.append(ConsumerResourceAllocationLoader(db_engine=engine,
-                            es_conn=es,
-                            index=loaderconf['index'],
-                            sql=loaderconf['sql'],
-                            doctype=loaderconf['type']))
-        elif loadername == "session_attributes":
-            loaders.append(SessionAttributesLoader(db_engine=engine,
-                            es_conn=es,
-                            index=loaderconf['index'],
-                            sql=loaderconf['sql'],
-                            doctype=loaderconf['type']))
-        elif loadername == "session_history":
-            loaders.append(SessionHistoryLoader(db_engine=engine,
-                            es_conn=es,
-                            index=loaderconf['index'],
-                            sql=loaderconf['sql'],
-                            doctype=loaderconf['type']))
-        else:
-            loaders.append(BasicSQLLoader(db_engine=engine,
-                            es_conn=es,
-                            index=loaderconf['index'],
-                            sql=loaderconf['sql'],
-                            doctype=loaderconf['type']))
+                            es_config=config))
     return loaders
 
 def main():
@@ -97,11 +79,11 @@ def main():
     setup = cfg['setup']
 
     # Set up logging
-    logger = logging.getLogger("Ensemble")
+    logger = logging.getLogger('Ensemble')
     logger.setLevel(logging.INFO)
     sh = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(asctime)s-[%(levelname)s]'
-                                    '-[%(name)s]- %(message)s')
+    formatter = logging.Formatter('%(asctime)s - [%(levelname)s] '
+                                    '- [%(name)s] - %(message)s')
     sh.setFormatter(formatter)
     logger.addHandler(sh)
     logger.info("Starting up with settings in %s" % CONFIG_FILE)
@@ -131,17 +113,11 @@ def main():
 
     # Build our list of SQL loaders
     logger.info("Building list of loaders")
-    #loaders = get_loaders(cfg, engine, es) 
+    loaders = get_loaders(cfg, engine, es, logger) 
 
     # We got all our configs, let's run now
     logger.info("Initialisation complete: let's do some ETL !")
-    loaderconf = cfg['loaders'].get('consumer_demand', {})
-    c = ConsumerDemandLoader(db_engine=engine,
-                    es_conn=es,
-                    sql=loaderconf['sql'],
-                    es_config=index_config.consumer_demand.config)
-    c.load()
-    sys.exit(1)
+    run(loaders, setup['interval'], logger)
 
 if __name__ == '__main__':
     main()
