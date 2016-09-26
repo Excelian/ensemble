@@ -1,9 +1,6 @@
 #
 # (c) 2015, Excelian Ltd
 #
-# file: ensemble/server.py
-# description : server ETL process  
-# ============================================================================
 
 import sys
 import logging
@@ -67,6 +64,7 @@ def get_loaders(cfg, engine, es, logger):
         loaders.append(loaderclass(db_engine=engine,
                             es_conn=es,
                             sql=loaderconf['sql'],
+                            max_rows=cfg['setup']['max_rows'],
                             es_config=config))
     return loaders
 
@@ -89,12 +87,20 @@ def main():
     logger.info("Starting up with settings in %s" % CONFIG_FILE)
 
     # Get a DB connection
-    engine = get_db_engine(setup['db_host'], setup['db_port'],
-            setup['db_name'], setup['db_user'], setup['db_pass'])
-    if not engine:
-        sys.exit("Invalid configuration for DB")
+    for _ in range(setup['db_max_retries']):
+        engine = get_db_engine(setup['db_host'], setup['db_port'],
+                setup['db_name'], setup['db_user'], setup['db_pass'])
+        if engine:
+            logger.info("DB connection Initialised")
+            break
 
-    logger.info("DB Engine done")
+        logger.warning("Retrying connection to Elasticsearch")
+        time.sleep(setup['db_retry_wait'])
+    else:
+        logger.criticial("Failed Connecting to Database")
+        sys.exit(1)
+
+
     # Get an Elasticsearch connection
     es_hosts = setup['es_hosts'].split(',')
     for _ in range(setup['es_max_retries']):

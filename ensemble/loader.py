@@ -1,9 +1,6 @@
 #
 # (c) 2015, Excelian Ltd
 #
-# file: ensemble/sqlloader.py
-# description : sqlloader module
-# ============================================================================
 
 import logging
 import urllib

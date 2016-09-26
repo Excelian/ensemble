@@ -4,18 +4,17 @@ setup:
     db_user: psetl 
     db_pass: abc123 
     db_port: 1433
+    db_max_retries: 2 # number of times to retry connecting
+    db_retry_wait: 5 # Seconds to wait before retrying connection
     es_hosts: 127.0.0.1,localhost  # Comma separated list of ES hosts in cluster
-    es_ssl: False
-    es_cacerts: /path/to/cacerts
-    es_verify_certs: False
+    es_ssl: False # Enable SSL for Elasticsearch connection
+    es_cacerts: /path/to/cacerts # Path to CA certificates
+    es_verify_certs: False # Do we verify certificate chain for SSL
     es_max_retries: 2 # number of times to retry connecting
     es_retry_wait: 5 # Seconds to wait before retrying connection
-    max_rows: 5000
-    identity_field: INSERT_SEQ
-    index: grid
+    max_rows: 5000 # Number of rows to retrieve from DB at a time
+    interval: 30 # Time to wait before each ETL loop
     debug: True 
-    log_file: ensemble.log
-    interval: 30
 loaders:
     consumer_resource_allocation:
         sql: > 
