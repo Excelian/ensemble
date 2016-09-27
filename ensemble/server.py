@@ -8,6 +8,7 @@ import sched
 import time
 import yaml
 import os
+import signal
 
 from loader import (
         BasicSQLLoader,
@@ -25,13 +26,23 @@ import index_config.session_attributes
 import index_config.session_history
 
 CONFIG_FILE="config.yml" # always look for config.yml in CWD
+cleanup_funcs = [] # List of cleanup functions to run before exiting
 
-def run(loaders, interval, logger):
+def cleanup(*args):
+    print("Cleaning up on exit")
+    for f in cleanup_funcs:
+        f()
+    print("Finished cleaning up, exiting")
+    sys.exit(0)
+
+def run(loaders, interval, logger, db, es):
     """ Main loop of server ETL that continuously schedules each loader
 
     :param loaders: list of loader objects 
     :param interval: duration in seconds between each loading iteration
     :param logger: logger object
+    :param db: sqlalchemy db engine instance 
+    :param es: Elasticsearch instance 
     """ 
     while True:
         logger.info('Begin scheduling tasks')
@@ -46,7 +57,6 @@ def run(loaders, interval, logger):
         scheduler.run()
         logger.info('All tasks completed, sleep %d seconds' % interval)
         time.sleep(interval)  # Sleep before next scheduling interval
-    return
 
 def get_loaders(cfg, engine, es, logger):
     classmap = {
@@ -100,6 +110,12 @@ def main():
         logger.criticial("Failed Connecting to Database")
         sys.exit(1)
 
+    # Clean up DB connection on exit
+    cleanup_funcs.append(engine.dispose)
+
+    # Catch TERM and INT signals for cleanup  
+    signal.signal(signal.SIGTERM, cleanup)
+    signal.signal(signal.SIGINT, cleanup)
 
     # Get an Elasticsearch connection
     es_hosts = setup['es_hosts'].split(',')
@@ -123,7 +139,7 @@ def main():
 
     # We got all our configs, let's run now
     logger.info("Initialisation complete: let's do some ETL !")
-    run(loaders, setup['interval'], logger)
+    run(loaders, setup['interval'], logger, engine, es)
 
 if __name__ == '__main__':
     main()
