@@ -4,11 +4,11 @@
 
 import sys
 import logging
-import sched
 import time
 import yaml
 import os
 import signal
+import threading
 
 from loader import (
         BasicSQLLoader,
@@ -27,6 +27,8 @@ import index_config.session_history
 
 CONFIG_FILE="config.yml" # always look for config.yml in CWD
 cleanup_funcs = [] # List of cleanup functions to run before exiting
+threads = [] # loader threads
+kill_threads = False
 
 def cleanup(*args):
     print("Cleaning up on exit")
@@ -35,28 +37,30 @@ def cleanup(*args):
     print("Finished cleaning up, exiting")
     sys.exit(0)
 
-def run(loaders, interval, logger, db, es):
-    """ Main loop of server ETL that continuously schedules each loader
+def worker(loader, interval):
+    """ Continuously load data in between intervals """
+    while not kill_threads:
+        loader.load()
+        time.sleep(interval)
+
+def cleanup_threads():
+    kill_threads = True
+    print("Kill signal sent to threads")
+    while threads:
+        print("Number of threads alive : %d" % len(threads))
+        print("Waiting 5 seconds for threads to finish")
+        time.sleep(5)
+
+def run(loaders, interval):
+    """ Create a thread for each loader and start running
 
     :param loaders: list of loader objects 
     :param interval: duration in seconds between each loading iteration
-    :param logger: logger object
-    :param db: sqlalchemy db engine instance 
-    :param es: Elasticsearch instance 
     """ 
-    while True:
-        logger.info('Begin scheduling tasks')
-        scheduler = sched.scheduler(time.time, time.sleep)
-        
-        # Add tasks to scheduler
-        for loader in loaders:
-            loader.load()
-            scheduler.enter(1, 1, loader.load, ())
-
-        # Run all tasks after adding them
-        scheduler.run()
-        logger.info('All tasks completed, sleep %d seconds' % interval)
-        time.sleep(interval)  # Sleep before next scheduling interval
+    for i in range(len(loaders)):
+        t = threading.Thread(target=worker, args=(loaders[i], interval))
+        threads.append(t)
+        t.start()
 
 def get_loaders(cfg, engine, es, logger):
     classmap = {
@@ -107,7 +111,7 @@ def main():
         logger.warning("Retrying connection to Elasticsearch")
         time.sleep(setup['db_retry_wait'])
     else:
-        logger.criticial("Failed Connecting to Database")
+        logger.critical("Failed Connecting to Database")
         sys.exit(1)
 
     # Clean up DB connection on exit
@@ -120,8 +124,8 @@ def main():
     # Get an Elasticsearch connection
     es_hosts = setup['es_hosts'].split(',')
     for _ in range(setup['es_max_retries']):
-        es = get_es_conn(es_hosts, setup['es_ssl'],
-                    setup['es_verify_certs'], setup['es_cacerts']) 
+        es = get_es_conn(es_hosts, setup['es_user'], setup['es_user'], 
+                setup['es_ssl'], setup['es_verify_certs'], setup['es_cacerts']) 
         if es:
             logger.info("Connected to Elasticsearch : %s" \
                 % es.info().get('cluster_name', 'unknown'))
@@ -130,7 +134,7 @@ def main():
         logger.warning("Retrying connection to Elasticsearch")
         time.sleep(setup['es_retry_wait'])
     else:
-        logger.criticial("Failed Connecting to Elasticsearch")
+        logger.critical("Failed Connecting to Elasticsearch")
         sys.exit(1)
 
     # Build our list of SQL loaders
@@ -139,7 +143,7 @@ def main():
 
     # We got all our configs, let's run now
     logger.info("Initialisation complete: let's do some ETL !")
-    run(loaders, setup['interval'], logger, engine, es)
+    run(loaders, setup['interval'])
 
 if __name__ == '__main__':
     main()

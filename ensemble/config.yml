@@ -7,6 +7,8 @@ setup:
     db_max_retries: 2 # number of times to retry connecting
     db_retry_wait: 5 # Seconds to wait before retrying connection
     es_hosts: 127.0.0.1,localhost  # Comma separated list of ES hosts in cluster
+    es_user: username
+    es_pass: passord
     es_ssl: False # Enable SSL for Elasticsearch connection
     es_cacerts: /path/to/cacerts # Path to CA certificates
     es_verify_certs: False # Do we verify certificate chain for SSL

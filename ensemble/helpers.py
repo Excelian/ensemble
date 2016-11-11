@@ -30,8 +30,8 @@ def get_db_engine(host, port, db_name, user, passwd):
     return sqlalchemy.create_engine(
             'mssql+pyodbc:///?odbc_connect=%s' % (urllib.quote_plus(c)))
 
-def get_es_conn(es_hostlist=None, ssl=False, verify_certs=False, 
-                cacerts_path=None):
+def get_es_conn(es_hostlist=None, es_user=None, es_pass=None, ssl=False,
+        verify_certs=False, cacerts_path=None):
     """ Returns an elasticsearch obj using config from setup
 
     :param es_hostlist: list of node hostnames in Elasticsearch cluster
@@ -52,12 +52,14 @@ def get_es_conn(es_hostlist=None, ssl=False, verify_certs=False,
         if ssl:
             es = Elasticsearch(
                     es_hostlist,
+                    http_auth=(es_user, es_pass),
                     use_ssl=True,
                     verify_certs=verify_certs,
                     cacerts=cacerts_path)
         else:
             es = Elasticsearch(
-                    es_hostlist, # We'll try and connect to hosts defined here
+                    es_hostlist,
+                    http_auth=(es_user, es_pass),
                     # sniff before doing anything
                     sniff_on_start=True,
                     # refresh nodes after a node fails to respond
