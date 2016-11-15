@@ -93,10 +93,12 @@ class Loader(object):
         :returns: SQLAlchemy result from sql query
         """
         self.logger.info("Running SQL where sequence > %s" % self.seq)
-        #res = self.engine.execute(self.sql, (self.max_rows, self.seq))
-        #results = res.fetchall()
-        results = self.engine.execute(self.sql,
-                (self.max_rows, self.seq)).fetchall()
+        try:
+            results = self.engine.execute(self.sql,
+                    (self.max_rows, self.seq)).fetchall()
+        except sqlalchemy.exc.ProgrammingError, err:
+            self.logger.critical("Error connecting to DB : %s" % err)
+            return None
         self.logger.info('Fetched %d rows from DB' % len(results))
         if not len(results):
             self.logger.info("No rows returned from DB. Finished loading")
