@@ -72,9 +72,12 @@ def get_loaders(cfg, engine, es, logger):
     }
     loaders = []
     for loadername, loaderconf in cfg['loaders'].iteritems():
-        logger.info("Creating loader : %s" % loadername)
         config = getattr(index_config, loadername).config
         loaderclass = classmap.get(loadername, BasicSQLLoader)
+        if loaderclass.__name__ == 'BasicSQLLoader':
+            logger.warning("Couldn't find loader for %s, falling back to BasicSQLLoader" % loadername)
+        else:
+            logger.info("Created loader : %s" % loaderclass.__name__)
         loaders.append(loaderclass(db_engine=engine,
                             es_conn=es,
                             sql=loaderconf['sql'],
